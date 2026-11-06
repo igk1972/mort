@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -531,28 +531,29 @@ func (r *RequestProcessor) processImage(obj *object.FileObject, parent *response
 
 	if err := storeProcessedImage(res, obj); err != nil {
 		monitoring.Log().Warn("Processor/processImage", obj.LogData(zap.Error(err))...)
+		res.Close()
+		errRes := response.NewError(500, err)
+		errRes.SetTransforms(mergedTrans)
+		return errRes
 	}
 
 	return res
 }
 
 func storeProcessedImage(res *response.Response, obj *object.FileObject) error {
-	// Ensure response is buffered (should already be after image processing)
 	body, err := res.Body()
 	if err != nil {
 		return err
 	}
 
-	// Share buffer with storage writer (read-only) - zero copy!
-	// bytes.NewReader creates a reader over the existing buffer without copying
-	headers := res.Headers.Clone()
-	contentLength := res.ContentLength
-
-	go func(objS object.FileObject, buf []byte, h http.Header, cl int64) {
-		reader := bytes.NewReader(buf)
-		storage.Set(&objS, h, cl, io.NopCloser(reader))
-	}(*obj, body, headers, contentLength)
-
+	stored := storage.Set(obj, res.Headers.Clone(), res.ContentLength, bytes.NewReader(body))
+	defer stored.Close()
+	if stored.HasError() {
+		return stored.Error()
+	}
+	if stored.StatusCode >= 400 {
+		return fmt.Errorf("storage set returned status %d", stored.StatusCode)
+	}
 	return nil
 }
 

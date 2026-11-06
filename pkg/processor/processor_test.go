@@ -12,7 +12,10 @@ import (
 	"github.com/aldor007/mort/pkg/throttler"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/stretchr/testify/assert"
+	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -678,4 +681,68 @@ func TestCollapseRedisLockTwoInstaces(t *testing.T) {
 	wg.Wait()
 	assert.Equal(t, res1.StatusCode, 200)
 	assert.Equal(t, res2.StatusCode, 200)
+}
+
+func storeConfig(t *testing.T, bucket, transformRoot string) *config.Config {
+	mortConfig := config.Config{}
+	err := mortConfig.LoadFromString(`
+buckets:
+    ` + bucket + `:
+        transform:
+            path: "\\/(?P<parent>[a-zA-Z0-9\\.\\/]+)\\-(?P<presetName>[a-z]+)"
+            kind: "presets"
+            parentBucket: "` + bucket + `"
+            presets:
+                small:
+                    quality: 75
+                    filters:
+                        thumbnail:
+                            width: 100
+                            height: 70
+        storages:
+            basic:
+                kind: "local-meta"
+                rootPath: "./benchmark"
+                bucket: "local"
+            transform:
+                kind: "local-meta"
+                rootPath: "` + transformRoot + `"
+`)
+	assert.Nil(t, err)
+	return &mortConfig
+}
+
+func TestTransformResultStoredBeforeResponse(t *testing.T) {
+	root := t.TempDir()
+	mortConfig := storeConfig(t, "stored", root)
+	req, _ := http.NewRequest("GET", "http://mort/stored/small.jpg-small", nil)
+	obj, err := object.NewFileObject(req.URL, mortConfig)
+	assert.Nil(t, err)
+
+	rp := NewRequestProcessor(mortConfig.Server, lock.NewMemoryLock(), throttler.NewBucketThrottler(10))
+	res := rp.Process(req, obj)
+	assert.Equal(t, 200, res.StatusCode)
+
+	stored := 0
+	filepath.WalkDir(root, func(_ string, d fs.DirEntry, _ error) error {
+		if d != nil && !d.IsDir() {
+			stored++
+		}
+		return nil
+	})
+	assert.NotZero(t, stored)
+}
+
+func TestTransformFailsWhenResultCannotBeStored(t *testing.T) {
+	readOnly := filepath.Join(t.TempDir(), "unstored")
+	assert.Nil(t, os.Mkdir(readOnly, 0o555))
+	t.Cleanup(func() { os.Chmod(readOnly, 0o755) })
+	mortConfig := storeConfig(t, "unstored", filepath.Dir(readOnly))
+	req, _ := http.NewRequest("GET", "http://mort/unstored/small.jpg-small", nil)
+	obj, err := object.NewFileObject(req.URL, mortConfig)
+	assert.Nil(t, err)
+
+	rp := NewRequestProcessor(mortConfig.Server, lock.NewMemoryLock(), throttler.NewBucketThrottler(10))
+	res := rp.Process(req, obj)
+	assert.Equal(t, 500, res.StatusCode)
 }
