@@ -302,7 +302,7 @@ Other options:
 
 **parentBucket** - this key will add defined name to path of parent when parsing
 
-**resultKey** - this key will define way of creating transform object unique key. Hash mean that key will be murmur hash from parent and transforms. When empty request path will be used.
+**resultKey** - this key will define way of creating transform object unique key. Hash mean that key will be murmur hash from parent and transforms. When empty request path will be used. `script` (only for `tengo` kind) stores the result under the key the script assigns to `obj.resultKey`; the request fails when the script leaves it unset or the key contains `..`.
 
 **parentStorage** - change storage from with mort should fetch originals of image
 

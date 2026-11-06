@@ -34,6 +34,7 @@ type FileObject struct {
 	Ctx            context.Context       // context of request
 	Range          string                // HTTP range in request
 	RangeData      httpRange             // start, end for HTTP range
+	ResultKey      string
 }
 
 // NewFileObjectFromPath create new instance of FileObject
@@ -154,6 +155,7 @@ func (o *FileObject) Copy() *FileObject {
 		Parent:         o.Parent,
 		CheckParent:    o.CheckParent,
 		AllowChangeKey: o.AllowChangeKey,
+		ResultKey:      o.ResultKey,
 		Debug:          o.Debug,
 		Ctx:            context.Background(),
 		Range:          o.Range,

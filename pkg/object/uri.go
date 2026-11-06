@@ -88,10 +88,29 @@ func Parse(url *url.URL, mortConfig *config.Config, obj *FileObject) error {
 				obj.Key = hashKey(obj)
 			case "hashParent":
 				obj.Key = hashKeyParent(obj)
+			case "script":
+				key, err := scriptResultKey(obj)
+				if err != nil {
+					return err
+				}
+				obj.Key = key
 			}
 		}
 	}
 	return nil
+}
+
+func scriptResultKey(obj *FileObject) (string, error) {
+	if obj.ResultKey == "" {
+		return "", errors.New("transform script did not set obj.resultKey")
+	}
+	key := "/" + strings.TrimPrefix(obj.ResultKey, "/")
+	for _, segment := range strings.Split(key, "/") {
+		if segment == ".." {
+			return "", fmt.Errorf("obj.resultKey %q must not contain '..'", obj.ResultKey)
+		}
+	}
+	return key, nil
 }
 
 func hashKey(obj *FileObject) string {

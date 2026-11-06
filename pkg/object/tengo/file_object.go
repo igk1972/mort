@@ -77,6 +77,7 @@ func (o *FileObject) IndexGet(index tengoLib.Object) (val tengoLib.Object, err e
 // * `allowChangeKey`
 // * `checkParent`
 // * `debug`
+// * `resultKey` storage key for the transform result, honoured when the bucket has resultKey: "script"
 func (o *FileObject) IndexSet(index, value tengoLib.Object) (err error) {
 	strIdx, ok := tengoLib.ToString(index)
 	if !ok {
@@ -91,6 +92,12 @@ func (o *FileObject) IndexSet(index, value tengoLib.Object) (err error) {
 		o.Value.CheckParent, _ = tengoLib.ToBool(value)
 	case "debug":
 		o.Value.Debug, _ = tengoLib.ToBool(value)
+	case "resultKey":
+		key, ok := value.(*tengoLib.String)
+		if !ok {
+			return tengoLib.ErrInvalidIndexValueType
+		}
+		o.Value.ResultKey = key.Value
 	}
 
 	return nil

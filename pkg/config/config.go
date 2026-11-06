@@ -222,6 +222,10 @@ func (c *Config) validateTransform(bucketName string, bucket *Bucket) error {
 		bucket.Transform.ResultKey = "hashParent"
 	}
 
+	if transform.ResultKey == "script" && transform.Kind != "tengo" {
+		err = configInvalidError(fmt.Sprintf("%s - resultKey \"script\" requires kind tengo", errorMsgPrefix))
+	}
+
 	if transform.Kind == "tengo" {
 		buf, errTengo := os.ReadFile(c.getPathToConfig(transform.TengoPath))
 		if errTengo != nil {

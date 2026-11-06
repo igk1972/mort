@@ -1,0 +1,21 @@
+text := import("text")
+
+parse := func(reqUrl, obj) {
+    if obj.bucket != "convert" {
+        return ["", undefined]
+    }
+    obj.transforms.format("jpeg")
+    mode := reqUrl.query["mode"]
+    if is_undefined(mode) {
+        obj.resultKey = text.split_n(obj.key, ".", 2)[0] + ".jpg"
+    } else if mode[0] == "escape" {
+        obj.resultKey = "/a/../../escape.jpg"
+    } else if mode[0] == "number" {
+        obj.resultKey = 1
+    }
+    return ["/originals" + obj.key, undefined]
+}
+
+result := parse(url, obj)
+parent := result[0]
+err := result[1]
